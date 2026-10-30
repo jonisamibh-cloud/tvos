@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cursor_desc">Shows a cursor and highlight so mobile apps can be used with the TV remote.</string>
+</resources>
