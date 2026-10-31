@@ -13,11 +13,13 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 
@@ -33,7 +35,9 @@ class CursorService : AccessibilityService() {
     private var ignored = setOf<String>()
     private var best: Rect? = null
     private var bestArea = Long.MAX_VALUE
+    private var lastFg = 0L
     private val hl = Runnable { updateHighlight() }
+    private val fg = Runnable { recomputeForeground() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -58,6 +62,7 @@ class CursorService : AccessibilityService() {
         wm.addView(overlay, lp)
         overlay.visibility = View.GONE
         refresh()
+        handler.postDelayed(fg, 500)
     }
 
     private fun mode(): String =
@@ -75,14 +80,33 @@ class CursorService : AccessibilityService() {
         return packageManager.queryIntentActivities(i, 0).any { it.activityInfo.packageName == pkg }
     }
 
-    override fun onAccessibilityEvent(e: AccessibilityEvent?) {
-        if (e == null || e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = e.packageName?.toString() ?: return
+    // Ask the TV which app is really in front, instead of trusting the order of events.
+    private fun foregroundPkg(): String? {
+        val ws = windows
+        if (!ws.isNullOrEmpty()) {
+            val w = ws.firstOrNull {
+                it.type == AccessibilityWindowInfo.TYPE_APPLICATION && (it.isActive || it.isFocused)
+            }
+            val p = w?.root?.packageName?.toString()
+            if (p != null) return p
+        }
+        return rootInActiveWindow?.packageName?.toString()
+    }
+
+    private fun recomputeForeground() {
+        lastFg = SystemClock.uptimeMillis()
+        val pkg = foregroundPkg() ?: return
         if (pkg in ignored) return
         onHome = (pkg == packageName)
         appIsMobile = if (pkg == packageName || isHome(pkg)) false
         else packageManager.getLeanbackLaunchIntentForPackage(pkg) == null
         refresh()
+    }
+
+    override fun onAccessibilityEvent(e: AccessibilityEvent?) {
+        if (e == null || e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        handler.removeCallbacks(fg)
+        handler.postDelayed(fg, 300)
     }
 
     private fun refresh() {
@@ -97,6 +121,9 @@ class CursorService : AccessibilityService() {
 
     override fun onKeyEvent(ev: KeyEvent): Boolean {
         if (!::overlay.isInitialized) return false
+        if (ev.action == KeyEvent.ACTION_DOWN && SystemClock.uptimeMillis() - lastFg > 1500) {
+            recomputeForeground()
+        }
         val a = active()
         if ((overlay.visibility == View.VISIBLE) != a) refresh()
         val k = ev.keyCode
@@ -219,6 +246,7 @@ class CursorService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(hl)
+        handler.removeCallbacks(fg)
         if (::overlay.isInitialized) runCatching { wm.removeView(overlay) }
         super.onDestroy()
     }
