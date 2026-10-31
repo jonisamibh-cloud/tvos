@@ -29,6 +29,7 @@ class CursorService : AccessibilityService() {
     private var cx = 0f
     private var cy = 0f
     private var appIsMobile = false
+    private var onHome = false
     private var ignored = setOf<String>()
     private var best: Rect? = null
     private var bestArea = Long.MAX_VALUE
@@ -62,7 +63,8 @@ class CursorService : AccessibilityService() {
     private fun mode(): String =
         getSharedPreferences("tvos", MODE_PRIVATE).getString("cursor_mode", "AUTO") ?: "AUTO"
 
-    private fun active(): Boolean = when (mode()) {
+    // The launcher itself never shows the cursor, so it can never get stuck there.
+    private fun active(): Boolean = if (onHome) false else when (mode()) {
         "ON" -> true
         "OFF" -> false
         else -> appIsMobile
@@ -77,6 +79,7 @@ class CursorService : AccessibilityService() {
         if (e == null || e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString() ?: return
         if (pkg in ignored) return
+        onHome = (pkg == packageName)
         appIsMobile = if (pkg == packageName || isHome(pkg)) false
         else packageManager.getLeanbackLaunchIntentForPackage(pkg) == null
         refresh()
