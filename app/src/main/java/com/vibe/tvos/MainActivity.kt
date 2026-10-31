@@ -181,18 +181,18 @@ class Store(private val sp: SharedPreferences) {
         sp.edit().putString("cursor_mode", cursor).apply()
     }
 
-    fun setWallpaper(i: Int) {
+    fun chooseWallpaper(i: Int) {
         wallpaper = i
         photo = null
         sp.edit().putInt("wallpaper", i).remove("photo").apply()
     }
 
-    fun setPhoto(u: String) {
+    fun choosePhoto(u: String) {
         photo = u
         sp.edit().putString("photo", u).apply()
     }
 
-    fun setAccent(i: Int) {
+    fun chooseAccent(i: Int) {
         accent = i
         sp.edit().putInt("accent", i).apply()
     }
@@ -256,7 +256,7 @@ class MainActivity : ComponentActivity() {
             runCatching {
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            store.setPhoto(uri.toString())
+            store.choosePhoto(uri.toString())
         }
     }
 
@@ -582,7 +582,7 @@ fun Swatch(i: Int, store: Store, modifier: Modifier) {
                 if (f) Color.White else ACCENTS[store.accent % ACCENTS.size],
                 shape
             )
-            .clickable { store.setWallpaper(i) },
+            .clickable { store.chooseWallpaper(i) },
         contentAlignment = Alignment.Center
     ) {
         if (sel) Text("\u2713", color = Color.White, fontSize = 20.sp)
@@ -600,7 +600,7 @@ fun Dot(i: Int, store: Store, modifier: Modifier) {
             .clip(shape)
             .background(ACCENTS[i])
             .border(if (f) 3.dp else 0.dp, if (store.dark) Color.White else Color.Black, shape)
-            .clickable { store.setAccent(i) },
+            .clickable { store.chooseAccent(i) },
         contentAlignment = Alignment.Center
     ) {
         if (store.accent == i) Text("\u2713", color = Color.Black, fontSize = 20.sp)
